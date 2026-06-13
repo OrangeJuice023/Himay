@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useRef } from "react";
 import Papa from "papaparse";
+import * as XLSX from "xlsx";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid,
 } from "recharts";
@@ -162,21 +163,45 @@ export default function Home() {
     [rows, fields]
   );
 
+  const loadData = (f: File, data: Row[], fields: string[]) => {
+    if (!data.length || !fields.length) {
+      setParseError("The file appears to be empty or has no header row.");
+      return;
+    }
+    setFile(f); setRows(data); setFields(fields); setDistCol(null);
+  };
+
   const handleFile = (f: File | undefined | null) => {
     if (!f) return;
-    if (!/\.csv$/i.test(f.name)) { setParseError("Please upload a CSV file."); return; }
     setParseError(null);
-    Papa.parse<Row>(f, {
-      header: true, skipEmptyLines: "greedy",
-      complete: (res) => {
-        if (!res.data.length || !res.meta.fields?.length) {
-          setParseError("The file appears to be empty or has no header row.");
-          return;
+
+    if (/\.csv$/i.test(f.name)) {
+      Papa.parse<Row>(f, {
+        header: true, skipEmptyLines: "greedy",
+        complete: (res) => loadData(f, res.data, res.meta.fields ?? []),
+        error: () => setParseError("Could not parse this file."),
+      });
+      return;
+    }
+
+    if (/\.xlsx?$/i.test(f.name)) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const wb = XLSX.read(e.target?.result, { type: "array" });
+          const sheet = wb.Sheets[wb.SheetNames[0]];
+          const data = XLSX.utils.sheet_to_json<Row>(sheet, { defval: "", raw: false });
+          loadData(f, data, data.length ? Object.keys(data[0]) : []);
+        } catch {
+          setParseError("Could not read this Excel file.");
         }
-        setFile(f); setRows(res.data); setFields(res.meta.fields); setDistCol(null);
-      },
-      error: () => setParseError("Could not parse this file."),
-    });
+      };
+      reader.onerror = () => setParseError("Could not read this file.");
+      reader.readAsArrayBuffer(f);
+      return;
+    }
+
+    setParseError("Please upload a CSV or Excel (.xlsx) file.");
   };
 
   const selectedDist = profile ? (distCol ?? profile.columns[0]?.name) : null;
@@ -236,11 +261,11 @@ export default function Home() {
               Himayin ang datos bago ito pagkatiwalaan.
             </h1>
             <p style={{ font: `400 16px ${FONT}`, color: T.sub, margin: "14px auto 36px", maxWidth: 520 }}>
-              Upload a CSV file and instantly uncover quality issues, anomalies, and insights — all profiled privately in your browser.
+              Upload a CSV or Excel file and instantly uncover quality issues, anomalies, and insights — all profiled privately in your browser.
             </p>
 
             <div
-              role="button" tabIndex={0} aria-label="Upload CSV dataset"
+              role="button" tabIndex={0} aria-label="Upload CSV or Excel dataset"
               onClick={() => inputRef.current?.click()}
               onKeyDown={(e) => e.key === "Enter" && inputRef.current?.click()}
               onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -257,10 +282,10 @@ export default function Home() {
               </div>
               <div style={{ font: `600 15px ${FONT}`, color: T.ink }}>Upload Dataset</div>
               <div style={{ font: `400 13px ${FONT}`, color: T.sub, marginTop: 6 }}>
-                Drag &amp; drop a .csv file here, or click to browse
+                Drag &amp; drop a .csv or .xlsx file here, or click to browse
               </div>
             </div>
-            <input ref={inputRef} type="file" accept=".csv" style={{ display: "none" }}
+            <input ref={inputRef} type="file" accept=".csv,.xlsx,.xls" style={{ display: "none" }}
               onChange={(e) => handleFile(e.target.files?.[0])} />
             {parseError && <p style={{ color: T.red, font: `400 14px ${FONT}`, marginTop: 16 }}>{parseError}</p>}
           </div>
