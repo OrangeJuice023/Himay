@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// POST /api/insight — body: { profile: <compact dataset profile> }
-// Requires GROQ_API_KEY in env (free key from https://console.groq.com).
+// POST /api/insight — body: { profile: <combined dataset + research profile> }
+// Requires GROQ_API_KEY in env (free key from https://console.groq.com/keys).
 export async function POST(req: NextRequest) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    return NextResponse.json(
-      { error: "GROQ_API_KEY is not configured." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "GROQ_API_KEY is not configured." }, { status: 500 });
   }
 
   const { profile } = await req.json();
@@ -16,17 +13,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing profile." }, { status: 400 });
   }
 
-  const prompt = `You are a senior data analyst.
+  const prompt = `You are a senior data analyst and academic research consultant.
 
-Analyze the following dataset profile.
+Analyze the dataset profile and provide a report with these sections, using markdown headings (###) for each:
 
-Provide:
-1. Executive Summary
-2. Key Data Quality Issues
-3. Potential Risks
-4. Recommended Cleaning Steps
+1. Dataset Overview
+2. Data Quality Assessment
+3. Survey Integrity Issues
+4. Research Risks
+5. Recommended Cleaning Steps
+6. Statistical Readiness Assessment
 
-Keep the report professional and concise. Use markdown headings (###) for each section and short bullet points.
+Write clearly for students and researchers who may not be statisticians. Be concise and practical — use short bullet points. If a section has no issues, say so briefly rather than inventing problems.
 
 Dataset Profile:
 ${JSON.stringify(profile)}`;
@@ -39,7 +37,7 @@ ${JSON.stringify(profile)}`;
     },
     body: JSON.stringify({
       model: "llama-3.3-70b-versatile",
-      max_tokens: 1024,
+      max_tokens: 1400,
       temperature: 0.4,
       messages: [{ role: "user", content: prompt }],
     }),
@@ -47,10 +45,7 @@ ${JSON.stringify(profile)}`;
 
   if (!res.ok) {
     const detail = await res.text();
-    return NextResponse.json(
-      { error: `Groq request failed (${res.status}).`, detail },
-      { status: 502 }
-    );
+    return NextResponse.json({ error: `Groq request failed (${res.status}).`, detail }, { status: 502 });
   }
 
   const data = await res.json();
