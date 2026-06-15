@@ -9,8 +9,9 @@ import {
 import { profileDataset, type DatasetProfile, type Row } from "@/lib/profile";
 import {
   analyzeResearch, methodologyDrafts, researchForAI, cleanDataset, toCSV,
-  buildReportMarkdown, type ResearchReport, type CleanOptions, type CorrelationMatrix,
+  type ResearchReport, type CleanOptions, type CorrelationMatrix,
 } from "@/lib/research";
+import { generateReportDocx } from "@/lib/report";
 import {
   T, SANS, SERIF, MONO, Icon, ICONS, Navbar, Footer, Card, Section, primaryBtn,
 } from "./ui";
@@ -18,6 +19,9 @@ import {
 /* ---------------- helpers ---------------- */
 const downloadText = (filename: string, text: string, mime: string) => {
   const blob = new Blob([text], { type: mime });
+  downloadBlob(filename, blob);
+};
+const downloadBlob = (filename: string, blob: Blob) => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url; a.download = filename;
@@ -316,6 +320,7 @@ export default function Home() {
   const [aiReport, setAiReport] = useState<string | null>(null);
   const [sheets, setSheets] = useState<SheetData[] | null>(null);
   const [activeSheet, setActiveSheet] = useState<string | null>(null);
+  const [reportBusy, setReportBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const profile = useMemo(
@@ -533,19 +538,25 @@ export default function Home() {
               {(file.size / 1024).toFixed(1)} KB · {profile.rows.toLocaleString()} rows · {profile.cols} columns
             </span>
             <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-              <button onClick={() => downloadText(
-                `${file.name.replace(/\.[^.]+$/, "")}_himay_report.md`,
-                buildReportMarkdown(
-                  { name: file.name, rows: profile.rows, cols: profile.cols },
-                  profile, research, methodologyDrafts(profile, research), aiReport
-                ),
-                "text/markdown;charset=utf-8"
-              )} style={{
+              <button onClick={async () => {
+                if (reportBusy) return;
+                setReportBusy(true);
+                try {
+                  const blob = await generateReportDocx(
+                    { name: file.name }, profile, research,
+                    methodologyDrafts(profile, research), aiReport
+                  );
+                  downloadBlob(`${file.name.replace(/\.[^.]+$/, "")}_himay_report.docx`, blob);
+                } catch {
+                  alert("Could not generate the report. Please try again.");
+                } finally { setReportBusy(false); }
+              }} disabled={reportBusy} style={{
                 background: "transparent", border: `1px solid ${T.line}`, borderRadius: 9,
                 padding: "7px 15px", font: `500 13px ${SANS}`, color: T.ink,
                 display: "flex", alignItems: "center", gap: 7,
+                opacity: reportBusy ? 0.6 : 1, cursor: reportBusy ? "wait" : "pointer",
               }}>
-                <Icon d={ICONS.doc} size={14} color={T.sub} /> Download report
+                <Icon d={ICONS.doc} size={14} color={T.sub} /> {reportBusy ? "Preparing…" : "Download report"}
               </button>
               <button onClick={reset} style={{
                 background: "transparent", border: `1px solid ${T.line}`,
