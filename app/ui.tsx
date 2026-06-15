@@ -55,6 +55,8 @@ export function Navbar({ onUpload }: { onUpload?: () => void }) {
     { label: "Features", href: "/#features" },
     { label: "How It Works", href: "/#how-it-works" },
     { label: "How To Use", href: "/how-to-use" },
+    { label: "Contact", href: "/contact" },
+    { label: "GitHub", href: GITHUB_URL },
   ];
   return (
     <header style={{
